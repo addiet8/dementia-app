@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Exec(mkdir)",
+      "Exec(npm run)",
+      "Exec(ls document)",
+      "Exec(ls app)",
+      "Exec(ls components)",
+      "Exec(npm install)",
+      "Exec(taskkill)",
+      "Exec(tasklist)",
+      "Exec(curl)",
+      "Exec(Invoke-WebRequest)",
+      "Exec(supabase db)",
+      "Exec(supabase status)"
+    ]
+  }
+}

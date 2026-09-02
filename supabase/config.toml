@@ -1,0 +1,10 @@
+[project]
+ref = "olgkugzitidlnvnwbkvr"
+api_url = "https://olgkugzitidlnvnwbkvr.supabase.co"
+db_url = "postgresql://postgres:your_password@olgkugzitidlnvnwbkvr.supabase.co:5432/postgres"
+
+[auth]
+enabled = true
+
+[storage]
+enabled = true
