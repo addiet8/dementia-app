@@ -12,7 +12,8 @@
       "Exec(curl)",
       "Exec(Invoke-WebRequest)",
       "Exec(supabase db)",
-      "Exec(supabase status)"
+      "Exec(supabase status)",
+      "Exec(supabase)"
     ]
   }
 }

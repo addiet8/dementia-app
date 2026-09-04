@@ -71,6 +71,20 @@ body {
   }
 }
 
+/* User-toggled high contrast class */
+html.high-contrast {
+  --color-background: #ffffff;
+  --color-foreground: #000000;
+  --color-card: #ffffff;
+  --color-card-foreground: #000000;
+  --color-primary: #002b20;
+  --color-border: #000000;
+  --color-input: #000000;
+  --color-muted: #f0f0f0;
+  --color-muted-foreground: #111111;
+  font-weight: 500;
+}
+
 /* Accessibility: Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -80,4 +94,12 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }

@@ -1,10 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    key,
     {
       cookies: {
         getAll: () => {
@@ -26,21 +29,30 @@ export async function middleware(req: NextRequest) {
   // Refresh auth token
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Auth routes - redirect to login page (let client-side handle auth)
+  // Auth routes
   const authPaths = ['/auth/login', '/auth/register', '/auth/forgot-password']
   const isAuthPath = authPaths.some(path => req.nextUrl.pathname.startsWith(path))
 
-  // Redirect root to login page
-  if (req.nextUrl.pathname === '/') {
-    return NextResponse.redirect(new URL('/auth/login', req.url))
-  }
-
-  // Redirect protected routes to login if not authenticated
-  const protectedPaths = ['/dashboard', '/exercises', '/schedule', '/memories', '/progress', '/profile']
+  // Protected routes
+  const protectedPaths = [
+    '/dashboard',
+    '/exercises',
+    '/schedule',
+    '/memories',
+    '/progress',
+    '/profile',
+    '/caregiver',
+    '/chat',
+  ]
   const isProtectedPath = protectedPaths.some(path => req.nextUrl.pathname.startsWith(path))
   
   if (isProtectedPath && !user && !isAuthPath) {
     return NextResponse.redirect(new URL('/auth/login', req.url))
+  }
+
+  // If already logged in and visiting auth page, redirect to dashboard
+  if (isAuthPath && user) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
   return NextResponse.next({
@@ -49,6 +61,8 @@ export async function middleware(req: NextRequest) {
     },
   })
 }
+
+export default proxy
 
 export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],

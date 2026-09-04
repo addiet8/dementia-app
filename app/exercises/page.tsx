@@ -103,7 +103,7 @@ export default function ExercisesPage() {
     const categories = ['memory', 'attention', 'reaction', 'visual']
     
     categories.forEach(category => {
-      const categoryData = performanceData.filter(p => p.category === category)
+      const categoryData = performanceData.filter(p => p.activity_type === category)
       
       if (categoryData.length > 0) {
         const avgAccuracy = categoryData.reduce((sum, p) => sum + (p.average_accuracy || 0), 0) / categoryData.length
@@ -310,7 +310,7 @@ function ExerciseRunner({ exercise }: { exercise: Exercise }) {
   }
 
   if (phase === "exercise") {
-    return <ExerciseContent exercise={exercise} isPractice={false} onComplete={(perf) => { setPerformance(perf); setPhase("results") }} onPerformance={(perf) => setPerformance(perf)} />
+    return <ExerciseContent exercise={exercise} isPractice={false} onComplete={(perf) => { if (perf) setPerformance(perf); setPhase("results") }} onPerformance={(perf) => setPerformance(perf)} />
   }
 
   if (phase === "results") {
@@ -367,36 +367,46 @@ function ExerciseResults({ exercise, performance, onRestart }: { exercise: Exerc
       }
 
       if (!activityData) {
-        console.error('No activity found for category:', exercise.category)
-        // Skip session save if no matching activity exists
-        return
-      }
+        console.warn('No activity found for category:', exercise.category, '- skipping session save but will save performance metrics')
+        // Continue to save performance metrics even without activity session
+      } else {
+        // Save activity session
+        const { data: sessionData, error: sessionError } = await supabase
+          .from('activity_sessions')
+          .insert({
+            user_id: session.user.id,
+            activity_id: activityData.id,
+            started_at: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
+            difficulty_level: exercise.difficulty,
+            completion_status: 'completed'
+          })
+          .select()
+          .single()
 
-      // Save activity session
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('activity_sessions')
-        .insert({
-          user_id: session.user.id,
-          activity_id: activityData.id,
-          started_at: new Date().toISOString(),
-          completed_at: new Date().toISOString(),
-          difficulty_level: exercise.difficulty,
-          completion_status: 'completed'
-        })
-        .select()
-        .single()
-
-      if (sessionError) {
-        console.error('Error saving session:', sessionError)
-        return
+        if (sessionError) {
+          console.error('Error saving session:', sessionError)
+          // Continue to save performance metrics even if session save fails
+        }
       }
 
       // Save performance metrics
+      console.log('Attempting to save performance metrics:', {
+        user_id: session.user.id,
+        activity_type: exercise.category,
+        date: new Date().toISOString().split('T')[0],
+        average_accuracy: performance.accuracy,
+        average_reaction_time: performance.avgResponseTime,
+        sessions_completed: 1,
+        difficulty_level: exercise.difficulty,
+        trend: 'stable'
+      })
+
       const { error: metricsError } = await supabase
         .from('performance_metrics')
         .insert({
           user_id: session.user.id,
-          category: exercise.category,
+          activity_type: exercise.category,
           date: new Date().toISOString().split('T')[0],
           average_accuracy: performance.accuracy,
           average_reaction_time: performance.avgResponseTime,
@@ -406,22 +416,54 @@ function ExerciseResults({ exercise, performance, onRestart }: { exercise: Exerc
         })
 
       if (metricsError) {
-        console.error('Error saving metrics:', metricsError)
-        // Try update instead if insert fails (duplicate for same day)
-        const { error: updateError } = await supabase
-          .from('performance_metrics')
-          .update({
-            average_accuracy: performance.accuracy,
-            average_reaction_time: performance.avgResponseTime,
-            sessions_completed: 1, // This would need aggregation in real implementation
-          })
-          .eq('user_id', session.user.id)
-          .eq('category', exercise.category)
-          .eq('date', new Date().toISOString().split('T')[0])
+        // Check if it's a duplicate key error (expected when record exists for today)
+        if (metricsError.code === '23505') {
+          console.log('Performance metrics already exist for today, updating instead')
+          // Update existing record instead of inserting
+          const { error: updateError } = await supabase
+            .from('performance_metrics')
+            .update({
+              average_accuracy: performance.accuracy,
+              average_reaction_time: performance.avgResponseTime,
+              sessions_completed: 1, // This would need aggregation in real implementation
+            })
+            .eq('user_id', session.user.id)
+            .eq('activity_type', exercise.category)
+            .eq('date', new Date().toISOString().split('T')[0])
 
-        if (updateError) {
-          console.error('Error updating metrics:', updateError)
+          if (updateError) {
+            console.error('Error updating metrics:', updateError)
+          } else {
+            console.log('Successfully updated performance metrics')
+          }
+        } else {
+          console.error('Error saving metrics:', metricsError)
         }
+      } else {
+        console.log('Successfully inserted new performance metrics')
+      }
+
+      // Notify connected caregivers of activity completion
+      try {
+        const { data: connections } = await supabase
+          .from('caregiver_connections')
+          .select('caregiver_id')
+          .eq('user_id', session.user.id)
+          .eq('status', 'active');
+
+        if (connections && connections.length > 0) {
+          const notificationsToInsert = connections.map((c: any) => ({
+            caregiver_id: c.caregiver_id,
+            user_id: session.user.id,
+            type: 'activity_completed',
+            title: 'Exercise Completed',
+            message: `Completed ${exercise.name} with ${performance.accuracy}% accuracy.`,
+            read: false,
+          }));
+          await supabase.from('notifications').insert(notificationsToInsert);
+        }
+      } catch (notifErr) {
+        console.warn('Could not insert caregiver notification:', notifErr);
       }
 
       setSaved(true)

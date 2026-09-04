@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Brain, Calendar, Clock, Pill, CheckCircle, Circle, Star, BookOpen } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { DailyCheckIn } from "@/components/daily-check-in";
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
@@ -70,6 +71,9 @@ export default async function DashboardPage() {
           Here's what's happening today.
         </p>
       </div>
+
+      {/* Daily Check-in */}
+      <DailyCheckIn />
 
       {/* Daily Goal */}
       <Card className="mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-2 border-blue-200 dark:border-blue-800">
